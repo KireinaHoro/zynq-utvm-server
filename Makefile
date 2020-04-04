@@ -1,7 +1,7 @@
 CC = gcc
 CLANG_FORMAT = clang-format
-CFLAGS = -O2 -Wall
-OBJS = daemon.o main.o
+CFLAGS = -O2 -Wall -g
+OBJS = daemon.o monitor.o gpio.o main.o
 CSRCS = $(OBJS:.o=.c)
 HEADERS = $(wildcard *.h)
 TARGET = server

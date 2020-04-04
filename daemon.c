@@ -1,12 +1,18 @@
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
+#include "daemon.h"
+#include "monitor.h"
 #include "packet.h"
 #include "socket.h"
 
@@ -18,16 +24,34 @@ ssize_t start(int port) {
   int addrlen = sizeof(address);
   zynq_packet_t packet;
 
+  // open /dev/mem
+  int fd = open("/dev/mem", O_RDWR | O_SYNC);
+  if (fd < 0) {
+    perror("open");
+    goto fail;
+  }
+  uint8_t *addr =
+      mmap(0, RISCV_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, RISCV_OFFSET);
+  if (addr == MAP_FAILED) {
+    perror("mmap");
+    goto fail_after_open;
+  }
+
+  // initialize monitor
+  if (initialize(addr) < 0) {
+    goto fail_after_mmap;
+  }
+
   if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
     perror("socket");
-    goto fail;
+    goto fail_after_mmap;
   }
 
   int opt = 1;
   if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt,
                  sizeof(opt))) {
     perror("setsockopt");
-    goto fail;
+    goto fail_after_mmap;
   }
 
   address.sin_family = AF_INET;
@@ -36,14 +60,15 @@ ssize_t start(int port) {
 
   if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
     perror("bind");
-    goto fail;
+    goto fail_after_mmap;
   }
 
   if (listen(server_fd, BACKLOG) < 0) {
     perror("listen");
-    goto fail;
+    goto fail_after_mmap;
   }
 
+  printf("listening for incoming connection on port %d\n", port);
   // client accept loop
   while (true) {
     memset(&packet, 0, sizeof(packet));
@@ -65,20 +90,24 @@ ssize_t start(int port) {
       switch (packet.type) {
       case READ: {
         printf("READ %p %ld\n", (void *)packet.rw.addr, packet.rw.len);
-        /* replace this with a pointer from mmap-ed /dev/mem */
-        uint8_t *buf = malloc(packet.rw.len);
-        memset(buf, 0, packet.rw.len);
+        if (packet.rw.addr < RISCV_OFFSET ||
+            packet.rw.addr >= RISCV_OFFSET + RISCV_SIZE) {
+          fprintf(stderr, "invalid address 0x%lx\n", packet.rw.addr);
+          goto client_fail;
+        }
+        uint8_t *buf = packet.rw.addr - RISCV_OFFSET + addr;
         SOCK_WRITE(new_socket, buf, packet.rw.len, client_fail)
-        free(buf);
         break;
       }
       case WRITE: {
         printf("WRITE %p %ld\n", (void *)packet.rw.addr, packet.rw.len);
-        /* replace this with a pointer from mmap-ed /dev/mem */
-        uint8_t *buf = malloc(packet.rw.len);
-        memset(buf, 0, packet.rw.len);
+        if (packet.rw.addr < RISCV_OFFSET ||
+            packet.rw.addr >= RISCV_OFFSET + RISCV_SIZE) {
+          fprintf(stderr, "invalid address 0x%lx\n", packet.rw.addr);
+          goto client_fail;
+        }
+        uint8_t *buf = packet.rw.addr - RISCV_OFFSET + addr;
         SOCK_READ(new_socket, buf, packet.rw.len, client_fail)
-        free(buf);
 
         /* ack after successfully written */
         uint32_t ack = ACK;
@@ -104,12 +133,17 @@ ssize_t start(int port) {
     // the above loop should not exit
   client_fail:
     close(new_socket);
-    printf("client disconnected.\n");
+    printf("client %s:%d disconnected\n", addr_str, ntohs(address.sin_port));
   }
 
   close(server_fd);
-
+  munmap(addr, RISCV_SIZE);
+  close(fd);
   return 0;
+fail_after_mmap:
+  munmap(addr, RISCV_SIZE);
+fail_after_open:
+  close(fd);
 fail:
   return -1;
 }
