@@ -10,36 +10,46 @@
 #include "daemon.h"
 #include "gpio.h"
 #include "monitor.h"
+#include "serial.h"
+#include "socket.h"
 
 /* load monitor software to RISC-V and read initialization magic
- * return monitor fd on success, -1 on failure
+ * return monitor tty fd on success, -1 on failure
  */
 int initialize(void *mem) {
   printf("initializing monitor with " MONITOR_FILENAME "\n");
   if (try_export(RESET_GPIO) < 0) {
-    return -1;
+    goto fail;
   }
   int monitor_fd = open(MONITOR_FILENAME, O_RDONLY);
   if (monitor_fd < 0) {
     perror("open " MONITOR_FILENAME);
-    return -1;
+    goto fail;
   }
   // stat data file to get size
   struct stat statbuf;
   if (fstat(monitor_fd, &statbuf)) {
     perror("stat" MONITOR_FILENAME);
-    return -1;
+    goto fail;
   }
   int dat_size = statbuf.st_size;
 
   uint8_t *dat_ptr = mmap(0, dat_size, PROT_READ, MAP_PRIVATE, monitor_fd, 0);
   if (dat_ptr == MAP_FAILED) {
     perror("mmap data" MONITOR_FILENAME);
-    return -1;
+    goto fail;
   }
 
   // copy data to start
   memcpy(mem, dat_ptr, dat_size);
+  munmap(dat_ptr, dat_size);
+  close(monitor_fd);
+
+  // initialize tty
+  int tty_fd = init_tty("/dev/ttyS1");
+  if (tty_fd < 0) {
+    goto fail;
+  }
 
   // reset RISC-V over GPIO
   write_pin(RESET_GPIO, 1);
@@ -47,10 +57,12 @@ int initialize(void *mem) {
   write_pin(RESET_GPIO, 0);
 
   // wait for INIT_MAGIC over tty
-
-  munmap(dat_ptr, dat_size);
-  close(monitor_fd);
-  return 0;
+  char buf[64];
+  SOCK_READ(tty_fd, buf, strlen(INIT_MAGIC), fail)
+  return tty_fd;
+fail:
+  printf("failed to initialize monitor\n");
+  return -1;
 }
 
 /* instruct monitor to execute at func_addr and return at stop_addr
