@@ -51,7 +51,7 @@ int initialize(void *mem) {
   close(monitor_fd);
 
   // initialize tty
-  int tty_fd = init_tty("/dev/ttyS1");
+  int tty_fd = init_tty(MONITOR_TTY);
   if (tty_fd < 0) {
     goto fail;
   }
@@ -71,16 +71,21 @@ fail:
 
 /* instruct monitor to execute at func_addr and return at stop_addr
  * will poll on client_fd to check if client disconnected
- * return 0 on successful finish, -1 on client_fd close
+ * return RISC-V sepc on successful finish, -1 on client_fd close
  */
 ssize_t execute(uint64_t func_addr, uint64_t stop_addr, int tty_fd,
                 int client_fd) {
-  char buf[MAXLINE];
+  char buf[MAXLINE], sepc[19];
+  sepc[18] = '\0';
   memset(buf, 0, MAXLINE);
   snprintf(buf, MAXLINE - 1, "%ld %ld\n", func_addr, stop_addr);
   SOCK_WRITE(tty_fd, buf, strlen(buf), fail)
+  // 0xXXXXXXXXXXXXXXXX, 18 chars
+  SOCK_READ(tty_fd, sepc, 18, fail)
+  uint64_t ret;
+  sscanf(sepc, "0x%lx", &ret);
   SOCK_READ(tty_fd, buf, strlen(EXIT_MAGIC), fail)
-  return 0;
+  return ret;
 fail:
   return -1;
 }

@@ -3,11 +3,12 @@
 
 #include <stdint.h>
 
-#define INIT_MAGIC "monitor-initialize\n"
-#define EXIT_MAGIC "monitor-exit\n"
+#define INIT_MAGIC "monitor-initialize\r\n"
+#define EXIT_MAGIC "monitor-exit\r\n"
 
 #define MONITOR_FILENAME "fw_payload.bin"
 #define MONITOR_TTY "/dev/ttyS1"
+//#define MONITOR_TTY "/tmp/ttyV0"
 #define RESET_GPIO 511
 
 /* load monitor software to RISC-V and read initialization magic
