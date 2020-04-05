@@ -15,6 +15,7 @@
 #include "monitor.h"
 #include "packet.h"
 #include "socket.h"
+#include "util.h"
 
 #define BACKLOG 3
 
@@ -98,6 +99,7 @@ ssize_t start(int port) {
         }
         uint8_t *buf = packet.rw.addr - RISCV_OFFSET + addr;
         SOCK_WRITE(new_socket, buf, packet.rw.len, client_fail)
+        // hexdump(buf, packet.rw.len);
         break;
       }
       case WRITE: {
@@ -109,6 +111,7 @@ ssize_t start(int port) {
         }
         uint8_t *buf = packet.rw.addr - RISCV_OFFSET + addr;
         SOCK_READ(new_socket, buf, packet.rw.len, client_fail)
+        // hexdump(buf, packet.rw.len);
 
         /* ack after successfully written */
         uint32_t ack = ACK;
