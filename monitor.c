@@ -42,6 +42,9 @@ int initialize(void *mem) {
     goto fail;
   }
 
+  // put RISC-V into reset - active low
+  write_pin(RESET_GPIO, 0);
+
   // copy data to start
   memcpy(mem, dat_ptr, dat_size);
   munmap(dat_ptr, dat_size);
@@ -53,10 +56,9 @@ int initialize(void *mem) {
     goto fail;
   }
 
-  // reset RISC-V over GPIO
-  write_pin(RESET_GPIO, 1);
+  // take RISC-V out of reset
   usleep(100 * 1000);
-  write_pin(RESET_GPIO, 0);
+  write_pin(RESET_GPIO, 1);
 
   // wait for INIT_MAGIC over tty
   char buf[MAXLINE];
