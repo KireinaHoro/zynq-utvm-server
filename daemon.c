@@ -38,7 +38,8 @@ ssize_t start(int port) {
   }
 
   // initialize monitor
-  if (initialize(addr) < 0) {
+  int tty_fd = initialize(addr);
+  if (tty_fd < 0) {
     goto fail_after_mmap;
   }
 
@@ -117,6 +118,10 @@ ssize_t start(int port) {
       case EXECUTE: {
         printf("EXECUTE %p %p\n", (void *)packet.exec.addr,
                (void *)packet.exec.stop);
+        if (execute(packet.exec.addr, packet.exec.stop, tty_fd, new_socket) <
+            0) {
+          goto client_fail;
+        }
 
         /* ack after breakpoint */
         uint32_t ack = ACK;

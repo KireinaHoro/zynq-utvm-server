@@ -13,6 +13,8 @@
 #include "serial.h"
 #include "socket.h"
 
+#define MAXLINE 128
+
 /* load monitor software to RISC-V and read initialization magic
  * return monitor tty fd on success, -1 on failure
  */
@@ -57,7 +59,7 @@ int initialize(void *mem) {
   write_pin(RESET_GPIO, 0);
 
   // wait for INIT_MAGIC over tty
-  char buf[64];
+  char buf[MAXLINE];
   SOCK_READ(tty_fd, buf, strlen(INIT_MAGIC), fail)
   return tty_fd;
 fail:
@@ -71,5 +73,12 @@ fail:
  */
 ssize_t execute(uint64_t func_addr, uint64_t stop_addr, int tty_fd,
                 int client_fd) {
+  char buf[MAXLINE];
+  memset(buf, 0, MAXLINE);
+  snprintf(buf, MAXLINE - 1, "%ld %ld\n", func_addr, stop_addr);
+  SOCK_WRITE(tty_fd, buf, strlen(buf), fail)
+  SOCK_READ(tty_fd, buf, strlen(EXIT_MAGIC), fail)
+  return 0;
+fail:
   return -1;
 }
