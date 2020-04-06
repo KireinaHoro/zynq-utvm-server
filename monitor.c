@@ -59,7 +59,7 @@ int initialize(void *mem) {
   }
 
   // take RISC-V out of reset
-  usleep(100 * 1000);
+  usleep(100);
   write_pin(RESET_GPIO, 1);
 
   // wait for INIT_MAGIC over tty
