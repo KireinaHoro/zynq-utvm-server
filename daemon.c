@@ -26,7 +26,8 @@ ssize_t start(int port) {
   zynq_packet_t packet;
 
   // open /dev/mem
-  int fd = open("/dev/mem", O_RDWR | O_SYNC);
+  // we have hardware coherency via HPC set up, no need for O_SYNC
+  int fd = open("/dev/mem", O_RDWR);
   if (fd < 0) {
     perror("open");
     goto fail;
