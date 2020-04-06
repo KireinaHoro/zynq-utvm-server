@@ -5,6 +5,7 @@
 
 #define INIT_MAGIC "monitor-initialize\r\n"
 #define EXIT_MAGIC "monitor-exit\r\n"
+#define FLUSH_MAGIC "monitor-flush\r\n"
 
 #define MONITOR_FILENAME "fw_payload.bin"
 #define MONITOR_TTY "/dev/ttyS1"
@@ -22,5 +23,11 @@ int initialize(void *mem);
  */
 ssize_t execute(uint64_t func_addr, uint64_t stop_addr, int tty_fd,
                 int client_fd);
+
+/* only meaningful when called after execute() (the monitor is in trap()
+ * already). flushes the cache in the region of [addr, addr+len) before read out
+ * from ARM
+ */
+void flush(uint64_t addr, uint64_t len, int tty_fd);
 
 #endif // _MONITOR_H_

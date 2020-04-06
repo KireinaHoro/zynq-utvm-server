@@ -89,3 +89,16 @@ ssize_t execute(uint64_t func_addr, uint64_t stop_addr, int tty_fd,
 fail:
   return -1;
 }
+
+/* only meaningful when called after execute() (the monitor is in trap()
+ * already). flushes the cache in the region of [addr, addr+len) before read out
+ * from ARM
+ */
+void flush(uint64_t addr, uint64_t len, int tty_fd) {
+  char buf[MAXLINE];
+  snprintf(buf, MAXLINE - 1, "%ld %ld\n", addr, len);
+  SOCK_WRITE(tty_fd, buf, strlen(buf), fail)
+  SOCK_READ(tty_fd, buf, strlen(FLUSH_MAGIC), fail);
+fail:
+  return;
+}

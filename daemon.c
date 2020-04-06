@@ -81,6 +81,7 @@ ssize_t start(int port) {
     }
     printf("accepted new client from %s:%d\n", addr_str,
            ntohs(address.sin_port));
+    int tty_fd = -1;
     // client process loop
     while (true) {
       SOCK_READ(new_socket, &packet, sizeof(packet), client_fail)
@@ -92,6 +93,7 @@ ssize_t start(int port) {
           fprintf(stderr, "invalid address 0x%lx\n", packet.rw.addr);
           goto client_fail;
         }
+        flush(packet.rw.addr, packet.rw.len, tty_fd);
         uint8_t *buf = packet.rw.addr - RISCV_OFFSET + addr;
         SOCK_WRITE(new_socket, buf, packet.rw.len, client_fail)
         // hexdump(buf, packet.rw.len);
@@ -114,10 +116,14 @@ ssize_t start(int port) {
         break;
       }
       case EXECUTE: {
-        // printf("EXECUTE %p %p\n", (void *)packet.exec.addr,
-        // (void *)packet.exec.stop);
+        printf("EXECUTE %p %p\n", (void *)packet.exec.addr,
+               (void *)packet.exec.stop);
         // initialize monitor
-        int tty_fd = initialize(addr);
+        if (tty_fd >= 0) {
+          // close old fd first, last used in READ
+          close(tty_fd);
+        }
+        tty_fd = initialize(addr);
         if (tty_fd < 0) {
           goto fail_after_mmap;
         }
@@ -129,9 +135,7 @@ ssize_t start(int port) {
           goto client_fail;
         }
 
-        printf("execute stopped at 0x%lx\n", sepc);
-
-        close(tty_fd);
+        // printf("execute stopped at 0x%lx\n", sepc);
 
         /* ack after breakpoint */
         uint32_t ack = ACK;
