@@ -85,7 +85,7 @@ ssize_t start(int port) {
       SOCK_READ(new_socket, &packet, sizeof(packet), client_fail)
       switch (packet.type) {
       case READ: {
-        printf("READ %p %ld\n", (void *)packet.rw.addr, packet.rw.len);
+        // printf("READ %p %ld\n", (void *)packet.rw.addr, packet.rw.len);
         if (packet.rw.addr < RISCV_OFFSET ||
             packet.rw.addr >= RISCV_OFFSET + RISCV_SIZE) {
           fprintf(stderr, "invalid address 0x%lx\n", packet.rw.addr);
@@ -97,7 +97,7 @@ ssize_t start(int port) {
         break;
       }
       case WRITE: {
-        printf("WRITE %p %ld\n", (void *)packet.rw.addr, packet.rw.len);
+        // printf("WRITE %p %ld\n", (void *)packet.rw.addr, packet.rw.len);
         if (packet.rw.addr < RISCV_OFFSET ||
             packet.rw.addr >= RISCV_OFFSET + RISCV_SIZE) {
           fprintf(stderr, "invalid address 0x%lx\n", packet.rw.addr);
@@ -113,8 +113,8 @@ ssize_t start(int port) {
         break;
       }
       case EXECUTE: {
-        printf("EXECUTE %p %p\n", (void *)packet.exec.addr,
-               (void *)packet.exec.stop);
+        // printf("EXECUTE %p %p\n", (void *)packet.exec.addr,
+        // (void *)packet.exec.stop);
         // initialize monitor
         int tty_fd = initialize(addr);
         if (tty_fd < 0) {

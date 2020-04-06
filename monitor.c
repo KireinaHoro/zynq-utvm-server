@@ -19,7 +19,7 @@
  * return monitor tty fd on success, -1 on failure
  */
 int initialize(void *mem) {
-  printf("initializing monitor with " MONITOR_FILENAME "\n");
+  // printf("initializing monitor with " MONITOR_FILENAME "\n");
   if (try_export(RESET_GPIO) < 0) {
     goto fail;
   }
