@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -12,6 +13,7 @@
 #include "monitor.h"
 #include "serial.h"
 #include "socket.h"
+#include "util.h"
 
 #define MAXLINE 128
 
@@ -80,12 +82,33 @@ ssize_t execute(uint64_t func_addr, uint64_t stop_addr, int tty_fd,
   memset(buf, 0, MAXLINE);
   snprintf(buf, MAXLINE - 1, "%ld %ld\n", func_addr, stop_addr);
   SOCK_WRITE(tty_fd, buf, strlen(buf), fail)
-  // 0xXXXXXXXXXXXXXXXX, 18 chars
-  SOCK_READ(tty_fd, sepc, 18, fail)
-  uint64_t ret;
-  sscanf(sepc, "0x%lx", &ret);
-  SOCK_READ(tty_fd, buf, strlen(EXIT_MAGIC), fail)
-  return ret;
+
+  // select between tty_fd and client_fd to handle client close in case
+  // we are stuck
+  fd_set rfds;
+  int nfds = max(tty_fd, client_fd) + 1;
+  struct timeval tv;
+  int retval;
+  FD_ZERO(&rfds);
+  FD_SET(client_fd, &rfds);
+  FD_SET(tty_fd, &rfds);
+
+  tv.tv_sec = EXECUTE_TIMEOUT;
+  tv.tv_usec = 0;
+
+  retval = select(nfds, &rfds, NULL, NULL, &tv);
+  if (retval > 0) {
+    if (FD_ISSET(tty_fd, &rfds)) {
+      // 0xXXXXXXXXXXXXXXXX, 18 chars
+      SOCK_READ(tty_fd, sepc, 18, fail)
+      uint64_t ret;
+      sscanf(sepc, "0x%lx", &ret);
+      SOCK_READ(tty_fd, buf, strlen(EXIT_MAGIC), fail)
+      return ret;
+    }
+    // client has closed or timeout has reached, fail the execute operation
+  }
+  printf("timeout waiting for execute\n");
 fail:
   return -1;
 }

@@ -12,6 +12,9 @@
 //#define MONITOR_TTY "/tmp/ttyV0"
 #define RESET_GPIO 511
 
+// select timeout for EXECUTE
+#define EXECUTE_TIMEOUT 10
+
 /* load monitor software to RISC-V and read initialization magic
  * return monitor fd on success, -1 on failure
  */

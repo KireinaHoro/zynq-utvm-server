@@ -68,6 +68,7 @@ ssize_t start(int port) {
   printf("listening for incoming connection on port %d\n", port);
   // client accept loop
   while (true) {
+    int tty_fd = -1;
     memset(&packet, 0, sizeof(packet));
     if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
                              (socklen_t *)&addrlen)) < 0) {
@@ -81,7 +82,6 @@ ssize_t start(int port) {
     }
     printf("accepted new client from %s:%d\n", addr_str,
            ntohs(address.sin_port));
-    int tty_fd = -1;
     // client process loop
     while (true) {
       SOCK_READ(new_socket, &packet, sizeof(packet), client_fail)
@@ -122,20 +122,18 @@ ssize_t start(int port) {
         if (tty_fd >= 0) {
           // close old fd first, last used in READ
           close(tty_fd);
+          tty_fd = -1;
         }
         tty_fd = initialize(addr);
         if (tty_fd < 0) {
           goto fail_after_mmap;
         }
 
-        uint64_t sepc;
+        ssize_t sepc;
         if ((sepc = execute(packet.exec.addr, packet.exec.stop, tty_fd,
                             new_socket)) < 0) {
-          close(tty_fd);
           goto client_fail;
         }
-
-        // printf("execute stopped at 0x%lx\n", sepc);
 
         /* ack after breakpoint */
         uint32_t ack = ACK;
@@ -151,6 +149,9 @@ ssize_t start(int port) {
 
     // the above loop should not exit
   client_fail:
+    if (tty_fd >= 0) {
+      close(tty_fd);
+    }
     close(new_socket);
     printf("client %s:%d disconnected\n", addr_str, ntohs(address.sin_port));
   }
